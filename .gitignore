@@ -1,0 +1,7 @@
+# ------------------ Project --------------------
+
+# Build files
+/out
+
+# Secret files
+/secrets
