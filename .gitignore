@@ -5,3 +5,6 @@
 
 # Secret files
 /secrets
+
+# Local fift test file
+/src/tests/test.fif

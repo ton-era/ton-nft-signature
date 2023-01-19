@@ -1,0 +1,35 @@
+;; Utilitary functions and constants
+
+int workchain() asm "0 PUSHINT";
+int max_msg_bitlen() asm "1016 PUSHINT"; ;; 127 ASCII characters
+
+
+() force_chain(slice addr) impure {
+  (int wc, _) = parse_std_addr(addr);
+  throw_unless(333, wc == workchain());
+}
+
+
+cell calculate_signature_stateinit(slice object_address, slice signee_address, slice provider_address, cell code) {
+  cell data = begin_cell()
+                .store_slice(object_address)
+                .store_slice(signee_address)
+                .store_slice(provider_address)
+              .end_cell();
+  return begin_cell()
+          .store_uint(0, 2)
+          .store_dict(code)
+          .store_dict(data)
+          .store_uint(0, 1)
+        .end_cell();
+}
+
+
+slice get_address_by_stateinit(int wc, cell state_init) {
+  return begin_cell()
+          .store_uint(4, 3)
+          .store_int(wc, 8)
+          .store_uint(cell_hash(state_init), 256)
+        .end_cell()
+        .begin_parse();
+}
