@@ -11,11 +11,18 @@ int op::edit_content() asm "0x1a0b9d51 PUSHINT";
 int op::transfer_editorship() asm "0x1c04412a PUSHINT";
 int op::editorship_assigned() asm "0x511a4463 PUSHINT";
 
-;; NFTSignable
+;; NFT Signature
+int op::sign()        asm "700 PUSHINT";
+int op::approve()     asm "701 PUSHINT";
+int op::fix_owner()   asm "702 PUSHINT";
+int op::notify_sign() asm "800 PUSHINT";
+
+
+
+
 int op::withraw() asm "1 PUSHINT";
 int op::update_fees() asm "700 PUSHINT";
 int op::open_sign() asm "777 PUSHINT";
 int op::cancel_sign() asm "778 PUSHINT";
-int op::approve_sign() asm "779 PUSHINT";
 int op::erase_sign() asm "780 PUSHINT";
 int op::collect_stats() asm "800 PUSHINT";
