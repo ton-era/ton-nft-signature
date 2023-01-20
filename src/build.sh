@@ -18,6 +18,13 @@ $FUNC_PATH \
         func/nft-signature.fc \
    -o $OUT_PATH/nft-signature-code.fif
 
+$FUNC_PATH \
+   -SPA func/stdlib.fc \
+        func/op-codes.fc \
+        func/utils.fc \
+        func/nft-provider.fc \
+   -o $OUT_PATH/nft-provider-code.fif
+
 # execute fift
 
 # $FIFT_EXE_PATH -s $TESTS_PATH/test.fif

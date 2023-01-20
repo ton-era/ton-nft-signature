@@ -1,23 +1,31 @@
+;; TODO:
+;;   - compare to SBT/Auction official code example
+;;   - write schemas for inbound msg requests
+;;   - update TEP
+
+
+
+
+
 ;; NFT Signature Smart Contract
 ;; For details see TEP https://github.com/ton-era/TEPs/blob/master/text/0090-tsc-standard.md.
 
 
 ;; -------------------------- Constants --------------------------
 
-int status::created()  asm "0 PUSHINT";
-int status::inited()   asm "1 PUSHINT";
-int status::approved() asm "2 PUSHINT";
+int const::min_gas_amount()       asm "10000000 PUSHINT"; ;; 0.01 TON
+int const::min_tons_for_storage() asm "60000000 PUSHINT"; ;; 0.06 TON
 
-int exit::wrong_sender()            asm "900 PUSHINT";
-int exit::wrong_init_address()      asm "901 PUSHINT";
-int exit::wrong_signee_address()    asm "902 PUSHINT";
-int exit::wrong_item_address()      asm "903 PUSHINT";
-int exit::signee_already_approved() asm "904 PUSHINT";
-int exit::owner_already_approved()  asm "905 PUSHINT";
-int exit::wrong_provider_address()  asm "906 PUSHINT";
-
-
-int exit::unknown_operation()       asm "0xffff PUSHINT";
+int exit::wrong_init_address()       asm "901 PUSHINT";
+int exit::wrong_signee_address()     asm "902 PUSHINT";
+int exit::wrong_item_address()       asm "903 PUSHINT";
+int exit::signee_already_approved()  asm "904 PUSHINT";
+int exit::owner_already_approved()   asm "905 PUSHINT";
+int exit::wrong_provider_address()   asm "906 PUSHINT";
+int exit::insufficient_init_value()  asm "907 PUSHINT";
+int exit::insufficient_msg_value()   asm "908 PUSHINT";
+int exit::already_inited()           asm "909 PUSHINT";
+int exit::unknown_operation()        asm "0xffff PUSHINT";
 
 
 ;; -------------------------- Storage --------------------------
@@ -99,22 +107,22 @@ global cell  payload;
 }
 
 
-;; -------------------------- Requests --------------------------
+;; -------------------------- handlers --------------------------
 
 () check_approved() impure {
-  ifnot (time_owner_approve | time_signee_approve) {
-    return ();
-  }
+    ifnot (time_owner_approve | time_signee_approve) {
+      return ();
+    }
 
-  var msg = begin_cell()
-        .store_uint(0x10, 6) ;; nobounce
-        .store_slice(provider_address)
-        .store_coins(0)
-        .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
-        .store_uint(op::notify_sign(), 32)
-        .store_uint(0, 64) 
-        .store_slice(item_address)
-        .store_slice(signee_address);
+    var msg = begin_cell()
+          .store_uint(0x10, 6) ;; nobounce
+          .store_slice(provider_address)
+          .store_coins(0)
+          .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+          .store_uint(op::notify_sign(), 32)
+          .store_uint(0, 64) 
+          .store_slice(item_address)
+          .store_slice(signee_address);
 
     send_raw_message(msg.end_cell(), 1);  ;; paying fees, revert on errors
 
@@ -134,10 +142,10 @@ global cell  payload;
         .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
         .store_uint(op::transfer(), 32)
         .store_uint(query_id, 64) 
-        .store_slice(item_owner_address) ;; new_owner_address
+        .store_slice(item_owner_address) ;; owner_address
         .store_slice(item_owner_address) ;; response_address;
         .store_int(0, 1)  ;; empty custom_payload
-        .store_coins(0)   ;; forward amount to new_owner_address
+        .store_coins(0)   ;; forward amount to owner_address
         .store_int(0, 1); ;; empty forward_payload
 
     send_raw_message(msg.end_cell(), 1);  ;; paying fees, revert on errors
@@ -151,8 +159,10 @@ global cell  payload;
 }
 
 
-() handle::init(slice sender_address, slice in_msg_body) impure inline {
+() handle::init(int my_balance, int msg_value, slice sender_address, slice in_msg_body) impure {
     throw_unless(exit::wrong_init_address(), equal_slices(sender_address, provider_address));
+    throw_if(exit::already_inited(), time_created > 0);
+    throw_if(exit::insufficient_init_value(), my_balance + msg_value < const::min_tons_for_storage());
 
     time_created = now();
     save_data();
@@ -232,9 +242,12 @@ global cell  payload;
 
     ;; initialize contract
     if (time_created == 0) {
-        handle::init(sender_address, in_msg_body);
+        handle::init(my_balance, msg_value, sender_address, in_msg_body);
         return ();
     }
+
+    ;; gas safeguard
+    throw_unless(exit::insufficient_msg_value(), msg_value >= const::min_gas_amount());
 
     int op = in_msg_body~load_uint(32);
 

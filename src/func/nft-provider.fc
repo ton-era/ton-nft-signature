@@ -1,0 +1,338 @@
+;; TODO:
+;;   - compare to SBT/Auction official code example
+;;   - write schemas for storage and inbound msg requests
+;;   - update TEP
+
+
+
+
+
+
+
+;; NFT Signature Provider Smart Contract
+;; For details see TEP https://github.com/ton-era/TEPs/blob/master/text/0090-tsc-standard.md.
+
+
+;; -------------------------- Constants --------------------------
+
+int const::min_tons_for_storage()      asm "10000000000 PUSHINT";  ;; 10 TON
+int const::min_gas_amount()            asm    "10000000 PUSHINT";  ;; 0.01 TON
+int const::min_signature_init_amount() asm    "60000000 PUSHINT";  ;; 0.06 TON
+int const::min_signature_fee()         asm   "150000000 PUSHINT";  ;; 0.15 TON
+int const::return_item_amount()        asm    "15000000 PUSHINT";  ;; 0.015 TON
+
+int exit::wrong_init_sender()         asm "800 PUSHINT";
+int exit::wrong_withraw_sender()      asm "801 PUSHINT";
+int exit::wrong_update_sender()       asm "802 PUSHINT";
+int exit::wrong_change_sender()       asm "803 PUSHINT";
+int exit::wrong_return_sender()       asm "804 PUSHINT";
+int exit::already_inited()            asm "805 PUSHINT";
+int exit::insufficient_init_value()   asm "806 PUSHINT";
+int exit::insuffucient_to_withraw()   asm "807 PUSHINT";
+int exit::incorrect_fees()            asm "808 PUSHINT";
+int exit::insufficient_deploy_value() asm "809 PUSHINT";
+int exit::insufficient_msg_value()    asm "810 PUSHINT";
+int exit::wrong_signature_sender()    asm "811 PUSHINT";
+int exit::unknown_operation()         asm "0xffff PUSHINT";
+
+
+;; -------------------------- Storage --------------------------
+
+global int   version;
+global int   id;
+global slice owner_address;
+global int   signature_open_cnt;
+global int   signature_commit_cnt;
+global int   signature_init_amount;
+global int   signature_init_fee;
+global cell  signature_code;
+
+
+() load_data() impure {
+    slice ds = get_data().begin_parse();
+
+    version = ds~load_uint(16);
+    id = ds~load_uint(32);
+    owner_address = ds~load_msg_addr();
+
+    if (ds.slice_bits() == 0) {  ;; not initialized yet
+      signature_open_cnt = 0;
+      signature_commit_cnt = 0;
+      signature_init_amount = 0;
+      signature_init_fee = 0;
+      signature_code = null();
+    }
+
+    signature_open_cnt = ds~load_uint(32);
+    signature_commit_cnt = ds~load_uint(32);
+    signature_init_amount = ds~load_coins();
+    signature_init_fee = ds~load_coins();
+    signature_code = ds~load_ref();
+
+    return ();
+}
+
+
+() save_data() impure {
+    set_data(
+        begin_cell()
+            .store_uint(version, 16)
+            .store_uint(id, 32)
+            .store_slice(owner_address)
+            .store_uint(signature_open_cnt, 32)
+            .store_uint(signature_commit_cnt, 32)
+            .store_coins(signature_init_amount)
+            .store_coins(signature_init_fee)
+            .store_ref(signature_code)
+        .end_cell());
+}
+
+
+;; -------------------------- Handlers --------------------------
+
+() handle::init(int my_balance, int msg_value, slice sender_address, slice in_msg_body) impure {
+    throw_unless(exit::wrong_init_sender(), equal_slices(sender_address, owner_address));
+    throw_if(exit::already_inited(), signature_init_amount > 0);
+    throw_if(exit::insufficient_init_value(), my_balance + msg_value < const::min_tons_for_storage());
+
+    int  signature_init_amount = in_msg_body~load_coins();
+    int  signature_init_fee = in_msg_body~load_coins();
+
+    throw_if(exit::incorrect_fees(), signature_init_fee < signature_init_amount);
+    throw_if(exit::incorrect_fees(), signature_init_amount < const::min_signature_init_amount());
+    throw_if(exit::incorrect_fees(), signature_init_fee < const::min_signature_fee());
+
+    cell signature_code = in_msg_body~load_ref();
+
+    save_data();
+
+    return ();
+}
+
+
+() handle::withraw(int my_balance, slice sender_address, slice in_msg_body) impure {
+    throw_unless(exit::wrong_withraw_sender(), equal_slices(sender_address, owner_address));
+
+    int amount = in_msg_body~load_coins();
+
+    throw_if(exit::insuffucient_to_withraw(),
+              my_balance < amount + const::min_tons_for_storage() + const::min_gas_amount());
+
+    slice to_address = in_msg_body~load_msg_addr();
+
+    var msg = begin_cell()
+                .store_uint(0x10, 6) ;; nobounce
+                .store_slice(to_address)
+                .store_coins(amount)
+                .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+              .end_cell();
+
+    send_raw_message(msg, 1); ;; paying fees, revert on errors
+
+    return ();
+}
+
+
+() handle::update_fees(slice sender_address, slice in_msg_body) impure {
+    throw_unless(exit::wrong_update_sender(), equal_slices(sender_address, owner_address));
+
+    int new_init_amount = in_msg_body~load_coins();
+    int new_init_fee = in_msg_body~load_coins();
+
+    throw_if(exit::incorrect_fees(), new_init_fee < new_init_amount);
+    throw_if(exit::incorrect_fees(), new_init_amount < const::min_signature_init_amount());
+    throw_if(exit::incorrect_fees(), new_init_fee < const::min_signature_fee());
+
+    signature_init_amount = new_init_amount;
+    signature_init_fee = new_init_fee;
+
+    save_data();
+}
+
+
+() handle::change_owner(slice sender_address, slice in_msg_body) impure {
+    throw_unless(exit::wrong_change_sender(), equal_slices(sender_address, owner_address));
+
+    slice new_owner_address = in_msg_body~load_msg_addr();
+    owner_address = new_owner_address;
+
+    save_data();
+}
+
+
+() handle::deploy_sign(int msg_value, slice sender_address, slice in_msg_body) impure {
+    slice item_address = in_msg_body~load_msg_addr();
+    slice signee_address = in_msg_body~load_msg_addr();
+
+    throw_unless(exit::insufficient_deploy_value(), msg_value >= signature_init_fee + const::min_gas_amount());
+
+    cell  state_init = calculate_signature_stateinit(my_address(), item_address, signee_address, signature_code);
+    slice signature_address = get_address_by_stateinit(0, state_init);
+    cell  body = begin_cell().end_cell();
+
+    var msg = begin_cell()
+              .store_uint(0x18, 6)
+              .store_slice(signature_address)
+              .store_coins(signature_init_amount)
+              .store_uint(4 + 2 + 1, 1 + 4 + 4 + 64 + 32 + 1 + 1 + 1)
+              .store_ref(state_init)
+              .store_ref(body)
+            .end_cell();
+
+    send_raw_message(msg, 1); ;; paying fees, revert on errors
+
+    signature_open_cnt += 1;
+    save_data();
+
+    return ();
+}
+
+
+() handle::collect_stats(slice sender_address, slice in_msg_body) impure {
+    slice item_address = in_msg_body~load_msg_addr();
+    slice signee_address = in_msg_body~load_msg_addr();
+
+    cell state_init = calculate_signature_stateinit(my_address(), item_address, signee_address, signature_code);
+    slice signature_address = get_address_by_stateinit(0, state_init);
+
+    throw_unless(exit::wrong_signature_sender(), equal_slices(sender_address, signature_address));
+
+    signature_commit_cnt += 1;
+
+    save_data();
+
+    return ();
+}
+
+
+() handle::return_item(slice sender_address, slice in_msg_body) impure {
+    throw_unless(exit::wrong_return_sender(), equal_slices(sender_address, owner_address));
+
+    slice item_address = in_msg_body~load_msg_addr();
+    slice signee_address = in_msg_body~load_msg_addr();
+    slice item_owner_address = in_msg_body~load_msg_addr();
+
+    cell state_init = calculate_signature_stateinit(my_address(), item_address, signee_address, signature_code);
+    slice signature_address = get_address_by_stateinit(0, state_init);
+
+    var msg = begin_cell()
+          .store_uint(0x10, 6) ;; nobounce
+          .store_slice(signature_address)
+          .store_coins(const::return_item_amount())
+          .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+          .store_uint(op::notify_sign(), 32)
+          .store_uint(0, 64) 
+          .store_slice(item_owner_address);
+
+    send_raw_message(msg.end_cell(), 1);  ;; paying fees, revert on errors
+
+    return ();
+}
+
+;; -------------------------- Internal --------------------------
+
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    ;; ignore empty messages: accept coins
+    if (in_msg_body.slice_empty?()) {
+        return ();
+    }
+
+    ;; ignore all bounced messages
+    slice cs = in_msg_full.begin_parse();
+    int flags = cs~load_uint(4);
+    if (flags & 1) {
+        return ();
+    }
+
+    slice sender_address = cs~load_msg_addr();
+
+    load_data();
+
+    ;; initialize contract
+    if (signature_init_amount == 0) {
+        handle::init(my_balance, msg_value, sender_address, in_msg_body);
+        return ();
+    }
+
+    ;; gas safeguard
+    throw_unless(exit::insufficient_msg_value(), msg_value >= const::min_gas_amount());
+
+    int op = in_msg_body~load_uint(32);
+
+    ;; withraw coins
+    if (op == op::withraw()) {
+        handle::withraw(my_balance, sender_address, in_msg_body);
+        return();
+    }
+
+    ;; update fees
+    if (op == op::update_fees()) {
+        handle::update_fees(sender_address, in_msg_body);
+        return();
+    }
+
+    ;; change provider owner
+    if (op == op::change_owner()) {
+        handle::change_owner(sender_address, in_msg_body);
+        return();
+    }
+
+    ;; deploy signature
+    if (op == op::deploy_sign()) {
+        handle::deploy_sign(msg_value, sender_address, in_msg_body);
+        return();
+    }
+
+    ;; collect stats
+    if (op == op::collect_stats()) {
+        handle::collect_stats(sender_address, in_msg_body);
+        return();
+    }
+
+    ;; return item
+    if (op == op::return_item()) {
+        handle::return_item(sender_address, in_msg_body);
+        return();
+    }
+
+    throw(exit::unknown_operation());
+}
+
+
+() recv_external(slice in_msg) impure {
+}
+
+
+;; -------------------------- GET Methods --------------------------
+
+(int, int, slice) get_info() method_id {
+  load_data();
+  return (version, id, owner_address);
+}
+
+
+(int, int) get_stats() method_id {
+  load_data();
+  return (signature_open_cnt, signature_commit_cnt);
+}
+
+
+(int, int) get_fees() method_id {
+  load_data();
+  return (signature_init_amount, signature_init_fee);
+}
+
+
+(cell) get_sign_code() method_id {
+  load_data();
+  return (signature_code);
+}
+
+
+(slice) get_signature_address(slice item_address, slice signee_address) method_id {
+  load_data();
+  cell state_init = calculate_signature_stateinit(my_address(), item_address, signee_address, signature_code);
+  slice signature_address = get_address_by_stateinit(0, state_init);
+  
+  return signature_address;
+}
