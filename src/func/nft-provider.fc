@@ -21,19 +21,19 @@ int const::min_signature_init_amount() asm    "60000000 PUSHINT";  ;; 0.06 TON
 int const::min_signature_fee()         asm   "150000000 PUSHINT";  ;; 0.15 TON
 int const::return_item_amount()        asm    "15000000 PUSHINT";  ;; 0.015 TON
 
-int exit::wrong_init_sender()         asm "800 PUSHINT";
-int exit::wrong_withraw_sender()      asm "801 PUSHINT";
-int exit::wrong_update_sender()       asm "802 PUSHINT";
-int exit::wrong_change_sender()       asm "803 PUSHINT";
-int exit::wrong_return_sender()       asm "804 PUSHINT";
-int exit::already_inited()            asm "805 PUSHINT";
-int exit::insufficient_init_value()   asm "806 PUSHINT";
-int exit::insuffucient_to_withraw()   asm "807 PUSHINT";
-int exit::incorrect_fees()            asm "808 PUSHINT";
-int exit::insufficient_deploy_value() asm "809 PUSHINT";
-int exit::insufficient_msg_value()    asm "810 PUSHINT";
-int exit::wrong_signature_sender()    asm "811 PUSHINT";
-int exit::unknown_operation()         asm "0xffff PUSHINT";
+int exit::wrong_init_sender()       asm "800 PUSHINT";
+int exit::wrong_withraw_sender()    asm "801 PUSHINT";
+int exit::wrong_update_sender()     asm "802 PUSHINT";
+int exit::wrong_change_sender()     asm "803 PUSHINT";
+int exit::wrong_return_sender()     asm "804 PUSHINT";
+int exit::already_inited()          asm "805 PUSHINT";
+int exit::insufficient_init_value() asm "806 PUSHINT";
+int exit::insuffucient_to_withraw() asm "807 PUSHINT";
+int exit::incorrect_fees()          asm "808 PUSHINT";
+int exit::insufficient_mint_value() asm "809 PUSHINT";
+int exit::insufficient_msg_value()  asm "810 PUSHINT";
+int exit::wrong_signature_sender()  asm "811 PUSHINT";
+int exit::unknown_operation()       asm "0xffff PUSHINT";
 
 
 ;; -------------------------- Storage --------------------------
@@ -160,11 +160,11 @@ global cell  signature_code;
 }
 
 
-() handle::deploy_sign(int msg_value, slice sender_address, slice in_msg_body) impure {
-    slice item_address = in_msg_body~load_msg_addr();
+() handle::mint_sign(int msg_value, slice sender_address, slice in_msg_body) impure {
+    slice item_address   = in_msg_body~load_msg_addr();
     slice signee_address = in_msg_body~load_msg_addr();
 
-    throw_unless(exit::insufficient_deploy_value(), msg_value >= signature_init_fee + const::min_gas_amount());
+    throw_unless(exit::insufficient_mint_value(), msg_value >= signature_init_fee + const::min_gas_amount());
 
     cell  state_init = calculate_signature_stateinit(my_address(), item_address, signee_address, signature_code);
     slice signature_address = get_address_by_stateinit(0, state_init);
@@ -277,9 +277,9 @@ global cell  signature_code;
         return();
     }
 
-    ;; deploy signature
-    if (op == op::deploy_sign()) {
-        handle::deploy_sign(msg_value, sender_address, in_msg_body);
+    ;; mint signature
+    if (op == op::mint_sign()) {
+        handle::mint_sign(msg_value, sender_address, in_msg_body);
         return();
     }
 

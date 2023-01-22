@@ -1,0 +1,11 @@
+"TonUtil.fif" include
+"Asm.fif" include
+
+"Collection code:" .dump cr
+"../out/nft-collection-code.fif" include 2 boc+>B Bx. cr cr
+
+"Provider code:" .dump cr
+"../out/nft-provider-code.fif" include 2 boc+>B Bx. cr cr
+
+"Signature code:" .dump cr
+"../out/nft-signature-code.fif" include 2 boc+>B Bx. cr cr
