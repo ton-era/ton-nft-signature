@@ -35,10 +35,10 @@ if __name__ == '__main__':
 
     # API :: deploy
     result = provider.deploy(
-        init_amount=0.1 + 0.01,
-        signature_init_amount=0.06 + 0.001,
-        signature_init_fee=0.15 + 0.001,
-        min_balance=0.1 + 0.001,
+        op_amount=0.11 + 0.01,
+        signature_init_amount=0.06,
+        signature_init_fee=0.15,
+        min_balance=0.11,
         wallet=wallet, client=client, send=send)
     print('-------------- API :: deploy --------------')
     print(result)

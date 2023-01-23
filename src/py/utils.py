@@ -39,25 +39,3 @@ def b64_from_addr(addr):
     b64_bytes = base64.urlsafe_b64decode(addr.encode('utf8'))[1:-2]
     bits = [1,0,0] + BitArray(b64_bytes) + [0, 0, 0, 0, 0]
     return base64.b64encode(bits.bytes).decode('utf8')
-
-
-def getmethod(func):
-    def wrapper(contract, client, stack_data=None):
-        stack_data = stack_data or []
-        method = func.__name__
-        task = client.provider.raw_run_method(
-            contract.address.to_string(),
-            method=method,
-            stack_data=stack_data)
-        results = client._run(task)
-        exit_code = results[0]['exit_code']
-
-        if exit_code == 0:
-            data = func(contract, results[0]['stack'])
-            extra = None
-        else:
-            data = None
-            extra = results
-
-        return {'exit_code': exit_code, 'data': data, 'extra': extra}
-    return wrapper

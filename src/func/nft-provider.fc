@@ -22,7 +22,6 @@ int const::min_signature_init_amount() asm    "60000000 PUSHINT";  ;; 0.06 TON
 int const::min_signature_fee()         asm   "150000000 PUSHINT";  ;; 0.15 TON
 int const::return_item_amount()        asm    "15000000 PUSHINT";  ;; 0.015 TON
 
-int exit::wrong_init_sender()       asm "800 PUSHINT";
 int exit::wrong_withraw_sender()    asm "801 PUSHINT";
 int exit::wrong_update_sender()     asm "802 PUSHINT";
 int exit::wrong_change_sender()     asm "803 PUSHINT";
@@ -99,22 +98,32 @@ global int min_balance;
 
 ;; -------------------------- Handlers --------------------------
 
-() handle::init(int my_balance, int msg_value, slice sender_address, slice in_msg_body) impure {
-    throw_unless(exit::wrong_init_sender(), equal_slices(sender_address, owner_address));
-    throw_if(exit::already_inited(), signature_init_amount > 0);
+() handle::update_fees(int my_balance, int msg_value, slice sender_address, slice in_msg_body) impure {
+    throw_unless(exit::wrong_update_sender(), equal_slices(sender_address, owner_address));
 
-    int signature_init_amount = in_msg_body~load_coins();
-    int signature_init_fee = in_msg_body~load_coins();
-    int min_balance = in_msg_body~load_coins();
+    int new_init_amount = in_msg_body~load_coins();
+    int new_init_fee    = in_msg_body~load_coins();
+    int new_min_balance = in_msg_body~load_coins();
 
-    throw_if(exit::incorrect_fees(), signature_init_fee < signature_init_amount);
-    throw_if(exit::incorrect_fees(), signature_init_amount < const::min_signature_init_amount());
-    throw_if(exit::incorrect_fees(), signature_init_fee < const::min_signature_fee());
-    throw_if(exit::incorrect_fees(), min_balance < const::min_tons_for_storage());
+    throw_if(exit::incorrect_fees(), new_init_amount < const::min_signature_init_amount());
+    throw_if(exit::incorrect_fees(), new_init_fee < const::min_signature_fee());
+    throw_if(exit::incorrect_fees(), new_init_fee < new_init_amount);
+    throw_if(exit::incorrect_fees(), new_min_balance < const::min_tons_for_storage());
     throw_if(exit::insufficient_init_value(), my_balance + msg_value < min_balance);
+
+    signature_init_amount = new_init_amount;
+    signature_init_fee = new_init_fee;
+    min_balance = new_min_balance;
 
     save_data();
 
+    return ();
+}
+
+
+() handle::init(int my_balance, int msg_value, slice sender_address, slice in_msg_body) impure {
+    throw_if(exit::already_inited(), signature_init_amount > 0);
+    handle::update_fees(my_balance, msg_value, sender_address, in_msg_body);
     return ();
 }
 
@@ -139,26 +148,6 @@ global int min_balance;
     send_raw_message(msg, 1); ;; paying fees, revert on errors
 
     return ();
-}
-
-
-() handle::update_fees(slice sender_address, slice in_msg_body) impure {
-    throw_unless(exit::wrong_update_sender(), equal_slices(sender_address, owner_address));
-
-    int new_init_amount = in_msg_body~load_coins();
-    int new_init_fee = in_msg_body~load_coins();
-    int new_min_balance = in_msg_body~load_coins();
-
-    throw_if(exit::incorrect_fees(), new_init_fee < new_init_amount);
-    throw_if(exit::incorrect_fees(), new_init_amount < const::min_signature_init_amount());
-    throw_if(exit::incorrect_fees(), new_init_fee < const::min_signature_fee());
-    throw_if(exit::incorrect_fees(), min_balance < const::min_tons_for_storage());
-
-    signature_init_amount = new_init_amount;
-    signature_init_fee = new_init_fee;
-    min_balance = new_min_balance;
-
-    save_data();
 }
 
 
@@ -279,7 +268,7 @@ global int min_balance;
 
     ;; update fees
     if (op == op::update_fees()) {
-        handle::update_fees(sender_address, in_msg_body);
+        handle::update_fees(my_balance, msg_value, sender_address, in_msg_body);
         return();
     }
 
