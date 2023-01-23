@@ -15,11 +15,3 @@ int op::mint_sign()     asm "753 PUSHINT";
 int op::collect_stats() asm "754 PUSHINT";
 int op::return_item()   asm "755 PUSHINT";
 int op::erase_sign()    asm "780 PUSHINT";
-
-
-
-;; TEMP
-
-int workchain() asm "0 PUSHINT";
-int op::get_royalty_params() asm "0x693d3950 PUSHINT";
-int op::report_royalty_params() asm "0xa8cb00ad PUSHINT";
