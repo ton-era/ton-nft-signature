@@ -15,7 +15,31 @@ class NFTSignature(Contract):
 
 
     def create_data_cell(self) -> Cell:
-        pass
+        cell = Cell()
+        cell.bits.write_address(self.options['provider_address'])
+        cell.bits.write_address(self.options['item_address'])
+        cell.bits.write_address(self.options['signee_address'])
+
+        return cell
+
+
+    def create_init_payload(self):
+        cell = Cell()
+        cell.bits.write_uint(1, 1)  # any non empty body to handle init
+
+        return cell
+
+
+    # API
+
+    def mint(self, 
+               op_amount,
+               wallet, client, send=True):
+        state_init = self.create_state_init()['state_init']
+        payload=self.create_init_payload()
+
+        return self.api_call(wallet, client, op_amount, state_init, payload, send)
+
 
 
     # GET

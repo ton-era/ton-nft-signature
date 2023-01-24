@@ -1,5 +1,14 @@
 ;; Utilitary functions
 
+int workchain() asm "0 PUSHINT";
+
+
+() force_chain(slice addr) impure {
+  (int wc, _) = parse_std_addr(addr);
+  throw_unless(333, wc == workchain());
+}
+
+
 cell calculate_signature_stateinit(slice provider_address, slice item_address, slice signee_address, cell code) {
   cell data = begin_cell()
                 .store_slice(provider_address)

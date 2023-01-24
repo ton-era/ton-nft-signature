@@ -15,6 +15,13 @@ $FUNC_PATH \
    -SPA func/stdlib.fc \
         func/op-codes.fc \
         func/utils.fc \
+        func/nft-item.fc \
+   -o $OUT_PATH/nft-item-code.fif
+
+$FUNC_PATH \
+   -SPA func/stdlib.fc \
+        func/op-codes.fc \
+        func/utils.fc \
         func/nft-signature.fc \
    -o $OUT_PATH/nft-signature-code.fif
 
