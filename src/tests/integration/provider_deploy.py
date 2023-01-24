@@ -53,6 +53,11 @@ if __name__ == '__main__':
     print('-------------- GET :: get_fees --------------')
     print(result)
 
+    # GET :: get_stats
+    result = provider.get_stats(client)
+    print('-------------- GET :: get_stats --------------')
+    print(result)
+
     # GET :: get_sign_code
     result = provider.get_sign_code(client)
     print('-------------- GET :: get_sign_code --------------')

@@ -221,7 +221,7 @@ global int min_balance;
           .store_slice(signature_address)
           .store_coins(const::return_item_amount())
           .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
-          .store_uint(op::notify_sign(), 32)
+          .store_uint(op::fix_owner(), 32)
           .store_uint(0, 64) 
           .store_slice(item_owner_address);
 
@@ -285,7 +285,7 @@ global int min_balance;
     }
 
     ;; collect stats
-    if (op == op::collect_stats()) {
+    if (op == op::notify_sign()) {
         handle::collect_stats(sender_address, in_msg_body);
         return();
     }

@@ -108,7 +108,7 @@ global cell  payload;
 ;; -------------------------- handlers --------------------------
 
 () check_approved() impure {
-    ifnot (time_owner_approve | time_signee_approve) {
+    if ((time_owner_approve == 0) | (time_signee_approve == 0)) {
       return ();
     }
 
@@ -207,7 +207,7 @@ global cell  payload;
 
 
 () handle::fix(slice sender_address, slice in_msg_body) impure {
-    throw_unless(exit::wrong_provider_address(), equal_slices(sender_address, item_address));
+    throw_unless(exit::wrong_provider_address(), equal_slices(sender_address, provider_address));
     return_item(in_msg_body);
     return();
 }
