@@ -56,47 +56,45 @@ global cell  payload;
 
 
 () load_data() impure {
-  slice ds = get_data().begin_parse();
+    slice ds = get_data().begin_parse();
 
-  provider_address = ds~load_msg_addr();
-  item_address     = ds~load_msg_addr();
-  signee_address   = ds~load_msg_addr();
+    provider_address = ds~load_msg_addr();
+    item_address     = ds~load_msg_addr();
+    signee_address   = ds~load_msg_addr();
 
-  if (ds.slice_bits() == 0) {  ;; not initialized yet
-    time_created = 0;
-    time_owner_approve  = 0;
-    time_signee_approve = 0;
-    has_payload = 0;
-    payload_code = 0;
-    payload = null();
+    if (ds.slice_bits() == 0) {  ;; not initialized yet
+        time_created = 0;
+        time_owner_approve  = 0;
+        time_signee_approve = 0;
+        has_payload = 0;
+
+        return ();
+    }
+
+    time_created = ds~load_uint(32);
+    time_owner_approve  = ds~load_uint(32);
+    time_signee_approve = ds~load_uint(32);
+    has_payload = (ds.slice_bits() > 0);
+    if (has_payload) {
+        payload_code = ds~load_uint(32);
+        payload = ds~load_ref();
+    } else {
+        payload_code = 0;
+        payload = null();
+    }
 
     return ();
-  }
-
-  time_created = ds~load_uint(32);
-  time_owner_approve  = ds~load_uint(32);
-  time_signee_approve = ds~load_uint(32);
-  has_payload  = ds~load_uint(1);
-  if (has_payload) {
-    payload_code = ds~load_uint(32);
-    payload = ds~load_ref();
-  } else {
-    payload_code = 0;
-    payload = null();
-  }
-
-  return ();
 }
 
 
 () save_data() impure {
     builder ds = begin_cell()
-          .store_slice(provider_address)
-          .store_slice(item_address)
-          .store_slice(signee_address)
-          .store_uint(time_created, 32)
-          .store_uint(time_owner_approve, 32)
-          .store_uint(time_signee_approve, 32);
+            .store_slice(provider_address)
+            .store_slice(item_address)
+            .store_slice(signee_address)
+            .store_uint(time_created, 32)
+            .store_uint(time_owner_approve, 32)
+            .store_uint(time_signee_approve, 32);
 
     if (has_payload) {
       ds = ds.store_uint(payload_code, 32)

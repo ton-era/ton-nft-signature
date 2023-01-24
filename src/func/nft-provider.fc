@@ -61,13 +61,13 @@ global int min_balance;
     signature_code = ds~load_ref();
 
     if (ds.slice_bits() == 0) {  ;; not initialized yet
-      signature_open_cnt = 0;
-      signature_commit_cnt = 0;
-      signature_init_amount = 0;
-      signature_init_fee = 0;
-      min_balance = 0;
+        signature_open_cnt = 0;
+        signature_commit_cnt = 0;
+        signature_init_amount = 0;
+        signature_init_fee = 0;
+        min_balance = 0;
 
-      return ();
+        return ();
     }
 
     signature_open_cnt = ds~load_uint(32);
@@ -161,7 +161,7 @@ global int min_balance;
 }
 
 
-() handle::mint_sign(int msg_value, slice sender_address, slice in_msg_body) impure {
+() handle::mint_signature(int msg_value, slice sender_address, slice in_msg_body) impure {
     slice item_address   = in_msg_body~load_msg_addr();
     slice signee_address = in_msg_body~load_msg_addr();
 
@@ -169,7 +169,7 @@ global int min_balance;
 
     cell  state_init = calculate_signature_stateinit(my_address(), item_address, signee_address, signature_code);
     slice signature_address = get_address_by_stateinit(0, state_init);
-    cell  body = begin_cell().end_cell();
+    cell  body = begin_cell().store_uint(0x1, 1).end_cell();  ;; any non empty body to handle init
 
     var msg = begin_cell()
               .store_uint(0x18, 6)
@@ -279,8 +279,8 @@ global int min_balance;
     }
 
     ;; mint signature
-    if (op == op::mint_sign()) {
-        handle::mint_sign(msg_value, sender_address, in_msg_body);
+    if (op == op::mint_signature()) {
+        handle::mint_signature(msg_value, sender_address, in_msg_body);
         return();
     }
 

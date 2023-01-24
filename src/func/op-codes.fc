@@ -8,10 +8,10 @@ int op::approve()     asm "701 PUSHINT";
 int op::fix_owner()   asm "702 PUSHINT";
 int op::notify_sign() asm "703 PUSHINT";
 
-int op::withraw()       asm "750 PUSHINT";
-int op::update_fees()   asm "751 PUSHINT";
-int op::change_owner()  asm "752 PUSHINT";
-int op::mint_sign()     asm "753 PUSHINT";
-int op::collect_stats() asm "754 PUSHINT";
-int op::return_item()   asm "755 PUSHINT";
-int op::erase_sign()    asm "780 PUSHINT";
+int op::withraw()        asm "750 PUSHINT";
+int op::update_fees()    asm "751 PUSHINT";
+int op::change_owner()   asm "752 PUSHINT";
+int op::mint_signature() asm "753 PUSHINT";
+int op::collect_stats()  asm "754 PUSHINT";
+int op::return_item()    asm "755 PUSHINT";
+int op::erase_sign()     asm "780 PUSHINT";

@@ -20,6 +20,7 @@ class Contract(ContractBase):
     def create_data_cell(self) -> Cell:
         pass
 
+
     # API
 
     def api_call(self, 
