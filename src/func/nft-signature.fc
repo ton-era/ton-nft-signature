@@ -15,6 +15,7 @@
 
 int const::min_gas_amount()       asm "10000000 PUSHINT"; ;; 0.01 TON
 int const::min_tons_for_storage() asm "60000000 PUSHINT"; ;; 0.06 TON
+int const::return_amount()        asm "10000000 PUSHINT"; ;; 0.01 TON
 
 int exit::wrong_init_address()       asm "901 PUSHINT";
 int exit::wrong_signee_address()     asm "902 PUSHINT";
@@ -128,20 +129,18 @@ global cell  payload;
 }
 
 () return_item(slice in_msg_body) impure {
-    throw_if(exit::owner_already_approved(), time_owner_approve > 0);
-
     int query_id = in_msg_body~load_uint(64);
     slice item_owner_address = in_msg_body~load_msg_addr();
 
     var msg = begin_cell()
         .store_uint(0x10, 6) ;; nobounce
         .store_slice(item_address)
-        .store_coins(0)
+        .store_coins(const::return_amount())
         .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
         .store_uint(op::transfer(), 32)
-        .store_uint(query_id, 64) 
+        .store_uint(query_id, 64)
         .store_slice(item_owner_address) ;; owner_address
-        .store_slice(item_owner_address) ;; response_address;
+        .store_uint(0, 2) ;; empty response_address;
         .store_int(0, 1)  ;; empty custom_payload
         .store_coins(0)   ;; forward amount to owner_address
         .store_int(0, 1); ;; empty forward_payload
@@ -215,6 +214,7 @@ global cell  payload;
 
 () handle::approve(slice sender_address, slice in_msg_body) impure {
     throw_unless(exit::wrong_item_address(), equal_slices(sender_address, item_address));
+    throw_if(exit::owner_already_approved(), time_owner_approve > 0);
     return_item(in_msg_body);
     return();
 }
@@ -264,6 +264,11 @@ global cell  payload;
     ;; fix owner - return item to owner in case of item freeze on this contract
     if (op == op::fix_owner()) {
         handle::fix(sender_address, in_msg_body);
+        return ();
+    }
+
+    ;; if there was response_destination upon item transfer - ignore it
+    if ((op == op::excesses()) & equal_slices(sender_address, item_address)) {
         return ();
     }
 

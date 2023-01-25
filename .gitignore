@@ -1,5 +1,8 @@
 # ------------------ Project --------------------
 
+# Python files
+__pycache__/
+
 # Build files
 /out
 

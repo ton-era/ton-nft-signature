@@ -30,7 +30,7 @@ if __name__ == '__main__':
 
     # API :: transfer
     result = item.transfer(
-        op_amount=0.03 + 0.005, new_owner_address=new_owner_address,
+        op_amount=0.03, new_owner_address=new_owner_address,
         wallet=wallet, client=client, send=send)
     print('-------------- API :: transfer --------------')
     print(result)
