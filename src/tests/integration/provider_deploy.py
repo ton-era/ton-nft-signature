@@ -3,7 +3,7 @@ Test usage:
 >  cd src
 >  python3 -m tests.integration.provider_deploy 1 [version] [id] [owner_address]
 wait...
-> python3 -m tests.integration.provider_deploy 0 [version] [id] [owner_address]
+>  python3 -m tests.integration.provider_deploy 0 [version] [id] [owner_address]
 
 check:
 https://testnet.tonscan.org/address/[provider_address]
@@ -36,8 +36,8 @@ if __name__ == '__main__':
     # API :: deploy
     result = provider.deploy(
         op_amount=0.11 + 0.01,
-        signature_init_amount=0.06,
-        signature_init_fee=0.15,
+        signature_init_amount=0.07,
+        signature_init_fee=0.30,
         min_balance=0.11,
         wallet=wallet, client=client, send=send)
     print('-------------- API :: deploy --------------')

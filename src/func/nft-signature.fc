@@ -14,8 +14,9 @@
 ;; -------------------------- Constants --------------------------
 
 int const::min_gas_amount()       asm "10000000 PUSHINT"; ;; 0.01 TON
-int const::min_tons_for_storage() asm "60000000 PUSHINT"; ;; 0.06 TON
+int const::min_tons_for_storage() asm "70000000 PUSHINT"; ;; 0.07 TON
 int const::return_amount()        asm "10000000 PUSHINT"; ;; 0.01 TON
+int const::stats_amount()         asm "10000000 PUSHINT"; ;; 0.01 TON
 
 int exit::wrong_init_address()       asm "901 PUSHINT";
 int exit::wrong_signee_address()     asm "902 PUSHINT";
@@ -40,8 +41,8 @@ int exit::unknown_operation()        asm "0xffff PUSHINT";
 ;;    item_address:MsgAddressInt
 ;;    signee_address:MsgAddressInt
 ;;    time_created:Bool
-;;    time_owner_approve:Bool
-;;    time_signee_approve:Bool
+;;    time_owner_approved:Bool
+;;    time_signee_approved:Bool
 ;;    payload:(Maybe ^Payload) = Storage;
 
 
@@ -49,10 +50,9 @@ global slice provider_address;
 global slice item_address;
 global slice signee_address;
 global int   time_created;
-global int   time_owner_approve;
-global int   time_signee_approve;
+global int   time_owner_approved;
+global int   time_signee_approved;
 global int   has_payload;
-global int   payload_code;
 global cell  payload;
 
 
@@ -65,22 +65,20 @@ global cell  payload;
 
     if (ds.slice_bits() == 0) {  ;; not initialized yet
         time_created = 0;
-        time_owner_approve  = 0;
-        time_signee_approve = 0;
+        time_owner_approved  = 0;
+        time_signee_approved = 0;
         has_payload = 0;
 
         return ();
     }
 
     time_created = ds~load_uint(32);
-    time_owner_approve  = ds~load_uint(32);
-    time_signee_approve = ds~load_uint(32);
+    time_owner_approved  = ds~load_uint(32);
+    time_signee_approved = ds~load_uint(32);
     has_payload = (ds.slice_bits() > 0);
     if (has_payload) {
-        payload_code = ds~load_uint(32);
         payload = ds~load_ref();
     } else {
-        payload_code = 0;
         payload = null();
     }
 
@@ -94,12 +92,11 @@ global cell  payload;
             .store_slice(item_address)
             .store_slice(signee_address)
             .store_uint(time_created, 32)
-            .store_uint(time_owner_approve, 32)
-            .store_uint(time_signee_approve, 32);
+            .store_uint(time_owner_approved, 32)
+            .store_uint(time_signee_approved, 32);
 
     if (has_payload) {
-      ds = ds.store_uint(payload_code, 32)
-             .store_ref(payload);
+      ds = ds.store_ref(payload);
     }
 
     set_data(ds.end_cell());
@@ -109,17 +106,16 @@ global cell  payload;
 ;; -------------------------- handlers --------------------------
 
 () check_approved() impure {
-    if ((time_owner_approve == 0) | (time_signee_approve == 0)) {
+    if ((time_owner_approved == 0) | (time_signee_approved == 0)) {
       return ();
     }
 
     var msg = begin_cell()
           .store_uint(0x10, 6) ;; nobounce
           .store_slice(provider_address)
-          .store_coins(0)
+          .store_coins(const::stats_amount())
           .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
           .store_uint(op::notify_sign(), 32)
-          .store_uint(0, 64) 
           .store_slice(item_address)
           .store_slice(signee_address);
 
@@ -147,7 +143,7 @@ global cell  payload;
 
     send_raw_message(msg.end_cell(), 1);  ;; paying fees, revert on errors
 
-    time_owner_approve = now();
+    time_owner_approved = now();
     check_approved();
 
     save_data();
@@ -170,21 +166,20 @@ global cell  payload;
 
 () handle::sign(slice sender_address, slice in_msg_body) impure {
     throw_unless(exit::wrong_signee_address(), equal_slices(sender_address, signee_address));
-    throw_if(exit::signee_already_approved(), time_signee_approve > 0);
+    throw_if(exit::signee_already_approved(), time_signee_approved > 0);
+    
+    int query_id = in_msg_body~load_uint(64);
 
     has_payload = in_msg_body~load_uint(1);
     if (has_payload) {
-        payload_code = in_msg_body~load_uint(32);
         payload = in_msg_body~load_ref();
     }
 
     int need_notify = in_msg_body~load_uint(1);
     if (need_notify) {
-        int query_id = in_msg_body~load_uint(64);
-
         slice notify_address = in_msg_body~load_msg_addr();
-        int notify_amount = in_msg_body~load_coins();
-        cell notify_payload = in_msg_body~load_ref();
+        int   notify_amount  = in_msg_body~load_coins();
+        cell  notify_payload = in_msg_body~load_ref();
 
         var msg = begin_cell()
           .store_uint(0x10, 6) ;; nobounce
@@ -198,7 +193,7 @@ global cell  payload;
         send_raw_message(msg.end_cell(), 1);  ;; paying fees, revert on errors
     }
 
-    time_signee_approve = now();
+    time_signee_approved = now();
     check_approved();
 
     save_data();
@@ -214,7 +209,7 @@ global cell  payload;
 
 () handle::approve(slice sender_address, slice in_msg_body) impure {
     throw_unless(exit::wrong_item_address(), equal_slices(sender_address, item_address));
-    throw_if(exit::owner_already_approved(), time_owner_approve > 0);
+    throw_if(exit::owner_already_approved(), time_owner_approved > 0);
     return_item(in_msg_body);
     return();
 }
@@ -278,16 +273,15 @@ global cell  payload;
 
 ;; -------------------------- GET Methods --------------------------
 
-(slice, slice, slice, int, int, int, int, cell) get_info() method_id {
+(slice, slice, slice, int, int, int, cell) get_info() method_id {
   load_data();
   return (
     provider_address,
     item_address,
     signee_address,
     time_created,
-    time_owner_approve,
-    time_signee_approve,
-    payload_code,
+    time_owner_approved,
+    time_signee_approved,
     payload
   );
 }

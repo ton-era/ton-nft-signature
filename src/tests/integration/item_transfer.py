@@ -14,7 +14,7 @@ from tonsdk.utils import Address
 
 from py.nft_item import NFTItem
 
-from .setup import wallet, client, arg
+from .setup import wallet, client
 
 
 if __name__ == '__main__':

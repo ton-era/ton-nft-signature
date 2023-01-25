@@ -33,7 +33,7 @@ if __name__ == '__main__':
     # API :: mint_signature
     provider = NFTSignatureProvider(address=Address(provider_address))
     result = provider.mint_signature(
-        op_amount=0.15 + 0.01 + 0.005, item_address=item_address, signee_address=signee_address,
+        op_amount=0.30 + 0.01 + 0.005, item_address=item_address, signee_address=signee_address,
         wallet=wallet, client=client, send=send)
     print('-------------- API :: mint_signature --------------')
     print(result)

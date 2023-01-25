@@ -1,6 +1,5 @@
-from tonsdk.utils import Address
+from tonsdk.utils import Address, to_nano
 from tonsdk.boc import Cell
-from tonsdk.utils import Address
 
 from .utils import addr_from_b64
 from .contract import Contract
@@ -34,7 +33,12 @@ class NFTItem(Contract):
         cell.bits.write_uint(0x5fcc3d14, 32)  # transfer OP
         cell.bits.write_uint(query_id, 64)
         cell.bits.write_address(new_owner_address)
-        cell.bits.write_address(response_address or new_owner_address)
+
+        if response_address:
+            cell.bits.write_address(response_address or new_owner_address)
+        else:
+            cell.bits.write_uint(0, 2)
+
         cell.bits.write_bit(False)  # null custom_payload
         cell.bits.write_grams(forward_amount)
         cell.bits.write_bit(False)  # forward_payload in this slice, not separate cell
@@ -66,6 +70,15 @@ class NFTItem(Contract):
                  op_amount, new_owner_address,
                  wallet, client, send=True):
         payload=self.create_transfer_body(Address(new_owner_address))
+        return self.api_call(wallet, client, op_amount, None, payload, send)
+
+
+    def approve(self, 
+                op_amount, signature_address, forward_amount,
+                wallet, client, send=True):
+        payload=self.create_transfer_body(
+            Address(signature_address), 
+            forward_amount=to_nano(forward_amount, 'ton'))
         return self.api_call(wallet, client, op_amount, None, payload, send)
 
 

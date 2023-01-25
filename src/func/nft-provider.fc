@@ -17,9 +17,9 @@
 
 ;; int const::min_tons_for_storage()      asm "10000000000 PUSHINT";  ;; 10 TON
 int const::min_tons_for_storage()      asm   "100000000 PUSHINT";  ;; 0.1 TON
-int const::min_gas_amount()            asm    "10000000 PUSHINT";  ;; 0.01 TON
-int const::min_signature_init_amount() asm    "60000000 PUSHINT";  ;; 0.06 TON
-int const::min_signature_fee()         asm   "150000000 PUSHINT";  ;; 0.15 TON
+int const::min_gas_amount()            asm     "5000000 PUSHINT";  ;; 0.005 TON
+int const::min_signature_init_amount() asm    "70000000 PUSHINT";  ;; 0.07 TON
+int const::min_signature_fee()         asm   "300000000 PUSHINT";  ;; 0.3 TON
 int const::return_item_amount()        asm    "15000000 PUSHINT";  ;; 0.015 TON
 
 int exit::wrong_withraw_sender()    asm "801 PUSHINT";
