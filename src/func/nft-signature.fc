@@ -75,7 +75,7 @@ global cell  payload;
     time_created = ds~load_uint(32);
     time_owner_approved  = ds~load_uint(32);
     time_signee_approved = ds~load_uint(32);
-    has_payload = (ds.slice_bits() > 0);
+    has_payload = (ds.slice_refs() > 0);
     if (has_payload) {
         payload = ds~load_ref();
     } else {
@@ -125,6 +125,8 @@ global cell  payload;
 }
 
 () return_item(slice in_msg_body) impure {
+    accept_message();
+
     int query_id = in_msg_body~load_uint(64);
     slice item_owner_address = in_msg_body~load_msg_addr();
 
@@ -167,15 +169,17 @@ global cell  payload;
 () handle::sign(slice sender_address, slice in_msg_body) impure {
     throw_unless(exit::wrong_signee_address(), equal_slices(sender_address, signee_address));
     throw_if(exit::signee_already_approved(), time_signee_approved > 0);
+
+    accept_message();
     
     int query_id = in_msg_body~load_uint(64);
 
-    has_payload = in_msg_body~load_uint(1);
+    has_payload = in_msg_body~load_int(1);
     if (has_payload) {
         payload = in_msg_body~load_ref();
     }
 
-    int need_notify = in_msg_body~load_uint(1);
+    int need_notify = in_msg_body~load_int(1);
     if (need_notify) {
         slice notify_address = in_msg_body~load_msg_addr();
         int   notify_amount  = in_msg_body~load_coins();
@@ -195,7 +199,7 @@ global cell  payload;
 
     time_signee_approved = now();
     check_approved();
-
+    
     save_data();
 }
 
@@ -273,7 +277,7 @@ global cell  payload;
 
 ;; -------------------------- GET Methods --------------------------
 
-(slice, slice, slice, int, int, int, cell) get_info() method_id {
+(slice, slice, slice, int, int, int, int, cell) get_info() method_id {
   load_data();
   return (
     provider_address,
@@ -282,6 +286,7 @@ global cell  payload;
     time_created,
     time_owner_approved,
     time_signee_approved,
+    has_payload,
     payload
   );
 }

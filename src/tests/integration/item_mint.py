@@ -25,7 +25,6 @@ if __name__ == '__main__':
     print(f' ------------------- send to blockchain: {send} ------------------- ')
 
     item = NFTItem(index=index, collection_address=collection_address)
-    print(f'contract: {item.address.to_string(True, True, True)}')
 
     # API :: deploy
     result = item.mint(
@@ -38,3 +37,5 @@ if __name__ == '__main__':
     result = item.get_nft_data(client)
     print('-------------- GET :: get_nft_data --------------')
     print(result)
+
+    print(f'contract: {item.address.to_string(True, True, True)}')

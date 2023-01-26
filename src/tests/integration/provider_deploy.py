@@ -31,7 +31,6 @@ if __name__ == '__main__':
         version=version, 
         id=id, 
         owner_address=Address(owner_address))
-    print(f'contract: {provider.address.to_string(True, True, True)}')
 
     # API :: deploy
     result = provider.deploy(
@@ -72,3 +71,5 @@ if __name__ == '__main__':
     result = provider.get_signature_address(
         client, stack_data=[['slice', item_address_slice], ['slice', signee_address_slice]])
     print(result)
+
+    print(f'contract: {provider.address.to_string(True, True, True)}')

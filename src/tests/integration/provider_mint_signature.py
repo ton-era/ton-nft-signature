@@ -55,3 +55,5 @@ if __name__ == '__main__':
     result = signature.get_info(client)
     print('-------------- GET :: signature get_info --------------')
     print(result)
+
+    print(f'contract: {signature_address}')
