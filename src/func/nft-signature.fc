@@ -13,17 +13,16 @@
 
 ;; -------------------------- Constants --------------------------
 
-int const::min_gas_amount()       asm "10000000 PUSHINT"; ;; 0.01 TON
-int const::min_tons_for_storage() asm "70000000 PUSHINT"; ;; 0.07 TON
-int const::return_amount()        asm "10000000 PUSHINT"; ;; 0.01 TON
-int const::stats_amount()         asm "10000000 PUSHINT"; ;; 0.01 TON
+int const::min_gas_amount()       asm  "10000000 PUSHINT"; ;; 0.01 TON
+int const::min_tons_for_storage() asm  "50000000 PUSHINT"; ;; 0.05 TON
+int const::return_amount()        asm  "10000000 PUSHINT"; ;; 0.01 TON
+int const::stats_amount()         asm "100000000 PUSHINT"; ;; 0.1  TON
 
-int exit::wrong_init_address()       asm "901 PUSHINT";
 int exit::wrong_signee_address()     asm "902 PUSHINT";
 int exit::wrong_item_address()       asm "903 PUSHINT";
 int exit::signee_already_approved()  asm "904 PUSHINT";
 int exit::owner_already_approved()   asm "905 PUSHINT";
-int exit::wrong_provider_address()   asm "906 PUSHINT";
+int exit::wrong_owner_address()      asm "906 PUSHINT";
 int exit::insufficient_init_value()  asm "907 PUSHINT";
 int exit::insufficient_msg_value()   asm "908 PUSHINT";
 int exit::already_inited()           asm "909 PUSHINT";
@@ -32,88 +31,103 @@ int exit::unknown_operation()        asm "0xffff PUSHINT";
 
 ;; -------------------------- Storage --------------------------
 
+;; info#_
+;;    time_created:int
+;;    time_owner_approved:int
+;;    time_signee_approved:int = Info;
+;;    item_owner_address:MsgAddress
+
+
 ;; payload#_
 ;;    content_code:uint32
 ;;    content:^Cell = Payload;
 
 ;; storage#_
-;;    provider_address:MsgAddressInt
 ;;    item_address:MsgAddressInt
 ;;    signee_address:MsgAddressInt
-;;    time_created:Bool
-;;    time_owner_approved:Bool
-;;    time_signee_approved:Bool
+;;    provider_address:MsgAddressInt
+;;    info:^Info
 ;;    payload:(Maybe ^Payload) = Storage;
 
 
-global slice provider_address; 
+;; stateinit
 global slice item_address;
 global slice signee_address;
+global slice provider_address; 
+
+;; state
 global int   time_created;
 global int   time_owner_approved;
 global int   time_signee_approved;
-global int   has_payload;
+global slice item_owner_address;
 global cell  payload;
 
 
 () load_data() impure {
     slice ds = get_data().begin_parse();
 
-    provider_address = ds~load_msg_addr();
     item_address     = ds~load_msg_addr();
     signee_address   = ds~load_msg_addr();
+    provider_address = ds~load_msg_addr();
 
-    if (ds.slice_bits() == 0) {  ;; not initialized yet
+    if (slice_refs_empty?(ds)) {  ;; not initialized yet
         time_created = 0;
         time_owner_approved  = 0;
         time_signee_approved = 0;
-        has_payload = 0;
+        item_owner_address = null();
+        payload = null();
 
         return ();
     }
 
-    time_created = ds~load_uint(32);
-    time_owner_approved  = ds~load_uint(32);
-    time_signee_approved = ds~load_uint(32);
-    has_payload = (ds.slice_refs() > 0);
-    if (has_payload) {
-        payload = ds~load_ref();
-    } else {
-        payload = null();
-    }
+    cell info = ds~load_ref();
+    slice is = info.begin_parse();
+    time_created = is~load_uint(32);
+    time_owner_approved  = is~load_uint(32);
+    time_signee_approved = is~load_uint(32);
+    item_owner_address = is~load_msg_addr();
+
+    payload = ds~load_dict();
 
     return ();
 }
 
 
 () save_data() impure {
-    builder ds = begin_cell()
-            .store_slice(provider_address)
-            .store_slice(item_address)
-            .store_slice(signee_address)
-            .store_uint(time_created, 32)
-            .store_uint(time_owner_approved, 32)
-            .store_uint(time_signee_approved, 32);
+    cell is = begin_cell()
+        .store_uint(time_created, 32)
+        .store_uint(time_owner_approved, 32)
+        .store_uint(time_signee_approved, 32)
+        .store_nullable_msg_addr(item_owner_address)
+        .end_cell();
 
-    if (has_payload) {
-      ds = ds.store_ref(payload);
-    }
+    cell ds = begin_cell()
+        .store_slice(item_address)
+        .store_slice(signee_address)
+        .store_slice(provider_address)
+        .store_ref(is)
+        .store_maybe_ref(payload)
+        .end_cell();
 
-    set_data(ds.end_cell());
+    set_data(ds);
 }
 
 
 ;; -------------------------- handlers --------------------------
 
-() check_approved() impure {
+() check_approved(int my_balance, int msg_value) impure {
     if ((time_owner_approved == 0) | (time_signee_approved == 0)) {
       return ();
     }
 
+    int stats_amount = min(
+        my_balance - const::min_tons_for_storage(),
+        const::stats_amount());
+
     var msg = begin_cell()
           .store_uint(0x10, 6) ;; nobounce
           .store_slice(provider_address)
-          .store_coins(const::stats_amount())
+          .store_coins(stats_amount)
           .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
           .store_uint(op::notify_sign(), 32)
           .store_slice(item_address)
@@ -124,11 +138,8 @@ global cell  payload;
   return ();
 }
 
-() return_item(slice in_msg_body) impure {
+() return_item(int my_balance, int msg_value, int query_id) impure {
     accept_message();
-
-    int query_id = in_msg_body~load_uint(64);
-    slice item_owner_address = in_msg_body~load_msg_addr();
 
     var msg = begin_cell()
         .store_uint(0x10, 6) ;; nobounce
@@ -146,7 +157,7 @@ global cell  payload;
     send_raw_message(msg.end_cell(), 1);  ;; paying fees, revert on errors
 
     time_owner_approved = now();
-    check_approved();
+    check_approved(my_balance, msg_value);
 
     save_data();
 
@@ -155,9 +166,8 @@ global cell  payload;
 
 
 () handle::init(int my_balance, int msg_value, slice sender_address, slice in_msg_body) impure {
-    throw_unless(exit::wrong_init_address(), equal_slices(sender_address, provider_address));
     throw_if(exit::already_inited(), time_created > 0);
-    throw_if(exit::insufficient_init_value(), my_balance + msg_value < const::min_tons_for_storage());
+    throw_if(exit::insufficient_init_value(), my_balance < const::min_tons_for_storage());
 
     time_created = now();
     save_data();
@@ -166,18 +176,15 @@ global cell  payload;
 }
 
 
-() handle::sign(slice sender_address, slice in_msg_body) impure {
+() handle::sign(int my_balance, int msg_value, slice sender_address, slice in_msg_body) impure {
     throw_unless(exit::wrong_signee_address(), equal_slices(sender_address, signee_address));
     throw_if(exit::signee_already_approved(), time_signee_approved > 0);
 
     accept_message();
-    
+
     int query_id = in_msg_body~load_uint(64);
 
-    has_payload = in_msg_body~load_int(1);
-    if (has_payload) {
-        payload = in_msg_body~load_ref();
-    }
+    payload = in_msg_body~load_dict();
 
     int need_notify = in_msg_body~load_int(1);
     if (need_notify) {
@@ -198,23 +205,31 @@ global cell  payload;
     }
 
     time_signee_approved = now();
-    check_approved();
+    check_approved(my_balance, msg_value);
     
     save_data();
 }
 
 
-() handle::fix(slice sender_address, slice in_msg_body) impure {
-    throw_unless(exit::wrong_provider_address(), equal_slices(sender_address, provider_address));
-    return_item(in_msg_body);
+() handle::fix(int my_balance, int msg_value, slice sender_address, slice in_msg_body) impure {
+    throw_unless(exit::wrong_owner_address(), equal_slices(sender_address, item_owner_address));
+
+    int query_id = in_msg_body~load_uint(64);
+    return_item(my_balance, msg_value, query_id);
+
     return();
 }
 
 
-() handle::approve(slice sender_address, slice in_msg_body) impure {
+() handle::approve(int my_balance, int msg_value, slice sender_address, slice in_msg_body) impure {
     throw_unless(exit::wrong_item_address(), equal_slices(sender_address, item_address));
     throw_if(exit::owner_already_approved(), time_owner_approved > 0);
-    return_item(in_msg_body);
+
+    int query_id = in_msg_body~load_uint(64);
+    item_owner_address = in_msg_body~load_msg_addr();
+
+    return_item(my_balance, msg_value, query_id);
+
     return();
 }
 
@@ -233,36 +248,44 @@ global cell  payload;
         return ();
     }
 
-    slice sender_address = cs~load_msg_addr();
-
     load_data();
 
-    ;; initialize contract
-    if (time_created == 0) {
-        handle::init(my_balance, msg_value, sender_address, in_msg_body);
-        return ();
-    }
+    slice sender_address = cs~load_msg_addr();
 
     ;; gas safeguard
     throw_unless(exit::insufficient_msg_value(), msg_value >= const::min_gas_amount());
 
+    ;; initialize contract
+    if (time_created == 0) {
+        handle::init(my_balance, msg_value, sender_address, in_msg_body);
+    }
+
+    if (in_msg_body.slice_bits() < 32) {
+        return ();
+    }
+
     int op = in_msg_body~load_uint(32);
 
-    ;; sign - approve by signee
-    if (op == op::approve()) {
-        handle::sign(sender_address, in_msg_body);
+    ;; just mint signature contract
+    if (op == op::mint()) {
         return();
     }
 
-    ;; approve by item owner
+    ;; approve by signee: sign
+    if (op == op::sign()) {
+        handle::sign(my_balance, msg_value, sender_address, in_msg_body);
+        return();
+    }
+
+    ;; approve by item owner: item application
     if (op == op::ownership_assigned()) {
-        handle::approve(sender_address, in_msg_body);
+        handle::approve(my_balance, msg_value, sender_address, in_msg_body);
         return ();
     }
 
     ;; fix owner - return item to owner in case of item freeze on this contract
     if (op == op::fix_owner()) {
-        handle::fix(sender_address, in_msg_body);
+        handle::fix(my_balance, msg_value, sender_address, in_msg_body);
         return ();
     }
 
@@ -277,16 +300,15 @@ global cell  payload;
 
 ;; -------------------------- GET Methods --------------------------
 
-(slice, slice, slice, int, int, int, int, cell) get_info() method_id {
+(slice, slice, slice, int, int, int, cell) get_info() method_id {
   load_data();
   return (
-    provider_address,
     item_address,
     signee_address,
+    provider_address,
     time_created,
     time_owner_approved,
     time_signee_approved,
-    has_payload,
     payload
   );
 }

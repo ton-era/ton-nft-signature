@@ -1,9 +1,9 @@
 '''
 Test usage:
 >  cd src
->  python3 -m tests.integration.item_transfer 1 item_address new_owner_address
+>  python3 -m tests.integration.02_item_transfer 1 item_address new_owner_address
 wait...
->  python3 -m tests.integration.item_transfer 0 item_address new_owner_address
+>  python3 -m tests.integration.02_item_transfer 0 item_address new_owner_address
 
 check:
 https://testnet.tonscan.org/address/[item-address]

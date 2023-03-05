@@ -9,6 +9,12 @@ int workchain() asm "0 PUSHINT";
 }
 
 
+builder store_nullable_msg_addr(builder b, slice s) impure {
+  b = null?(s) ? b.store_uint(0, 2) : b.store_slice(s);
+  return b;
+}
+
+
 cell calculate_signature_stateinit(slice provider_address, slice item_address, slice signee_address, cell code) {
   cell data = begin_cell()
                 .store_slice(provider_address)

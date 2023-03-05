@@ -1,9 +1,9 @@
 '''
 Test usage:
 >  cd src
->  python3 -m tests.integration.provider_deploy 1 [version] [id] [owner_address]
+>  python3 -m tests.integration.03_provider_deploy 1 [version] [id] [owner_address]
 wait...
->  python3 -m tests.integration.provider_deploy 0 [version] [id] [owner_address]
+>  python3 -m tests.integration.03_provider_deploy 0 [version] [id] [owner_address]
 
 check:
 https://testnet.tonscan.org/address/[provider_address]
@@ -28,28 +28,18 @@ if __name__ == '__main__':
     print(f' ------------------- send to blockchain: {send} ------------------- ')
 
     provider = NFTSignatureProvider(
-        version=version, 
-        id=id, 
+        version=version,
+        id=id,
         owner_address=Address(owner_address))
 
     # API :: deploy
-    result = provider.deploy(
-        op_amount=0.11 + 0.01,
-        signature_init_amount=0.07,
-        signature_init_fee=0.30,
-        min_balance=0.11,
-        wallet=wallet, client=client, send=send)
+    result = provider.deploy(op_amount=0.05, wallet=wallet, client=client, send=send)
     print('-------------- API :: deploy --------------')
     print(result)
 
     # GET :: get_info
     result = provider.get_info(client)
     print('-------------- GET :: get_info --------------')
-    print(result)
-
-    # GET :: get_fees
-    result = provider.get_fees(client)
-    print('-------------- GET :: get_fees --------------')
     print(result)
 
     # GET :: get_stats

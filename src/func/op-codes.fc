@@ -6,13 +6,10 @@ int op::get_static_data() asm "0x2fcb26a2 PUSHINT";
 int op::report_static_data() asm "0x8b771735 PUSHINT";
 
 ;; NFT Signature
-int op::sign()        asm "700 PUSHINT";
-int op::approve()     asm "701 PUSHINT";
+int op::mint()        asm "700 PUSHINT";
+int op::sign()        asm "701 PUSHINT";
 int op::fix_owner()   asm "702 PUSHINT";
 int op::notify_sign() asm "703 PUSHINT";
 
 int op::withraw()        asm "750 PUSHINT";
-int op::update_fees()    asm "751 PUSHINT";
-int op::change_owner()   asm "752 PUSHINT";
-int op::mint_signature() asm "753 PUSHINT";
-int op::return_item()    asm "754 PUSHINT";
+int op::change_owner()   asm "751 PUSHINT";

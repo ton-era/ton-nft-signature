@@ -1,9 +1,9 @@
 '''
 Test usage:
 >  cd src
->  python3 -m tests.integration.item_mint 1 index [owner_address]
+>  python3 -m tests.integration.01_item_mint 1 index [owner_address]
 wait...
->  python3 -m tests.integration.item_mint 0 index [owner_address]
+>  python3 -m tests.integration.01_item_mint 0 index [owner_address]
 
 check:
 https://testnet.tonscan.org/address/[item-address]

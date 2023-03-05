@@ -1,14 +1,16 @@
 '''
 Test usage:
 >  cd src
->  python3 -m tests.integration.signature_mint 1 [provider_address] [item_address] [signee_address]
+>  python3 -m 'tests.integration.06_signee_signature_mint&sign' 1 item_address [signee_address] [provider_address]
 wait...
->  python3 -m tests.integration.signature_mint 0 [provider_address] [item_address] [signee_address]
+>  python3 -m 'tests.integration.06_signee_signature_mint&sign' 0 item_address [signee_address] [provider_address]
 
 check:
 https://testnet.tonscan.org/address/[signature_address]
 '''
 import sys
+
+from tonsdk.utils import Address
 
 from py.nft_provider import NFTSignature
 
@@ -17,22 +19,22 @@ from .setup import wallet, client, arg
 
 if __name__ == '__main__':
     send = bool(int(sys.argv[1]))
-    provider_address = arg(sys.argv, 2, wallet.address)
-    item_address = arg(sys.argv, 3, wallet.address)
-    signee_address = arg(sys.argv, 4, wallet.address)
+    item_address = Address(sys.argv[2])
+    signee_address = Address(arg(sys.argv, 3, wallet.address))
+    provider_address = Address(arg(sys.argv, 4, wallet.address))
 
     print(sys.argv)
     print(f' ------------------- send to blockchain: {send} ------------------- ')
 
     signature = NFTSignature(
-        provider_address=provider_address,
         item_address=item_address,
-        signee_address=signee_address)
+        signee_address=signee_address,
+        provider_address=provider_address)
     print(f'contract: {signature.address.to_string(True, True, True)}')
 
     # API :: deploy
-    result = signature.mint(
-        op_amount=0.03 + 0.01,
+    result = signature.signee_mint(
+        op_amount=0.1 + 0.001, message="From Pavel with love..",
         wallet=wallet, client=client, send=send)
     print('-------------- API :: deploy --------------')
     print(result)
@@ -41,3 +43,5 @@ if __name__ == '__main__':
     result = signature.get_info(client)
     print('-------------- GET :: get_info --------------')
     print(result)
+
+    print(f'contract: {signature.address.to_string(True, True, True)}')

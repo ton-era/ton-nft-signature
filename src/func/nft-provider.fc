@@ -15,22 +15,13 @@
 
 ;; -------------------------- Constants --------------------------
 
-;; int const::min_tons_for_storage()      asm "10000000000 PUSHINT";  ;; 10 TON
-int const::min_tons_for_storage()      asm   "100000000 PUSHINT";  ;; 0.1 TON
-int const::min_gas_amount()            asm     "5000000 PUSHINT";  ;; 0.005 TON
-int const::min_signature_init_amount() asm    "70000000 PUSHINT";  ;; 0.07 TON
-int const::min_signature_fee()         asm   "300000000 PUSHINT";  ;; 0.3 TON
-int const::return_item_amount()        asm    "15000000 PUSHINT";  ;; 0.015 TON
+int const::min_gas_amount() asm "5000000 PUSHINT";  ;; 0.005 TON
 
 int exit::wrong_withraw_sender()    asm "801 PUSHINT";
-int exit::wrong_update_sender()     asm "802 PUSHINT";
 int exit::wrong_change_sender()     asm "803 PUSHINT";
-int exit::wrong_return_sender()     asm "804 PUSHINT";
 int exit::already_inited()          asm "805 PUSHINT";
-int exit::insufficient_init_value() asm "806 PUSHINT";
 int exit::insuffucient_to_withraw() asm "807 PUSHINT";
 int exit::incorrect_fees()          asm "808 PUSHINT";
-int exit::insufficient_mint_value() asm "809 PUSHINT";
 int exit::insufficient_msg_value()  asm "810 PUSHINT";
 int exit::wrong_signature_sender()  asm "811 PUSHINT";
 int exit::unknown_operation()       asm "0xffff PUSHINT";
@@ -42,14 +33,8 @@ int exit::unknown_operation()       asm "0xffff PUSHINT";
 global int   version;
 global int   id;
 global slice owner_address;
+global int   signature_commit_cnt;
 global cell  signature_code;
-
-;; state
-global int signature_open_cnt;
-global int signature_commit_cnt;
-global int signature_init_amount;
-global int signature_init_fee;
-global int min_balance;
 
 
 () load_data() impure {
@@ -58,23 +43,8 @@ global int min_balance;
     version = ds~load_uint(16);
     id = ds~load_uint(32);
     owner_address = ds~load_msg_addr();
-    signature_code = ds~load_ref();
-
-    if (ds.slice_bits() == 0) {  ;; not initialized yet
-        signature_open_cnt = 0;
-        signature_commit_cnt = 0;
-        signature_init_amount = 0;
-        signature_init_fee = 0;
-        min_balance = 0;
-
-        return ();
-    }
-
-    signature_open_cnt = ds~load_uint(32);
     signature_commit_cnt = ds~load_uint(32);
-    signature_init_amount = ds~load_coins();
-    signature_init_fee = ds~load_coins();
-    min_balance = ds~load_coins();
+    signature_code = ds~load_ref();
 
     return ();
 }
@@ -86,11 +56,7 @@ global int min_balance;
             .store_uint(version, 16)
             .store_uint(id, 32)
             .store_slice(owner_address)
-            .store_uint(signature_open_cnt, 32)
             .store_uint(signature_commit_cnt, 32)
-            .store_coins(signature_init_amount)
-            .store_coins(signature_init_fee)
-            .store_coins(min_balance)
             .store_ref(signature_code)
         .end_cell());
 }
@@ -98,43 +64,13 @@ global int min_balance;
 
 ;; -------------------------- Handlers --------------------------
 
-() handle::update_fees(int my_balance, int msg_value, slice sender_address, slice in_msg_body) impure {
-    throw_unless(exit::wrong_update_sender(), equal_slices(sender_address, owner_address));
-
-    int new_init_amount = in_msg_body~load_coins();
-    int new_init_fee    = in_msg_body~load_coins();
-    int new_min_balance = in_msg_body~load_coins();
-
-    throw_if(exit::incorrect_fees(), new_init_amount < const::min_signature_init_amount());
-    throw_if(exit::incorrect_fees(), new_init_fee < const::min_signature_fee());
-    throw_if(exit::incorrect_fees(), new_init_fee < new_init_amount);
-    throw_if(exit::incorrect_fees(), new_min_balance < const::min_tons_for_storage());
-    throw_if(exit::insufficient_init_value(), my_balance + msg_value < min_balance);
-
-    signature_init_amount = new_init_amount;
-    signature_init_fee = new_init_fee;
-    min_balance = new_min_balance;
-
-    save_data();
-
-    return ();
-}
-
-
-() handle::init(int my_balance, int msg_value, slice sender_address, slice in_msg_body) impure {
-    throw_if(exit::already_inited(), signature_init_amount > 0);
-    handle::update_fees(my_balance, msg_value, sender_address, in_msg_body);
-    return ();
-}
-
-
 () handle::withraw(int my_balance, slice sender_address, slice in_msg_body) impure {
     throw_unless(exit::wrong_withraw_sender(), equal_slices(sender_address, owner_address));
 
     int amount = in_msg_body~load_coins();
 
     throw_if(exit::insuffucient_to_withraw(),
-             my_balance < amount + min_balance + const::min_gas_amount());
+             my_balance < amount + const::min_gas_amount());
 
     slice to_address = in_msg_body~load_msg_addr();
 
@@ -161,34 +97,6 @@ global int min_balance;
 }
 
 
-() handle::mint_signature(int msg_value, slice sender_address, slice in_msg_body) impure {
-    slice item_address   = in_msg_body~load_msg_addr();
-    slice signee_address = in_msg_body~load_msg_addr();
-
-    throw_unless(exit::insufficient_mint_value(), msg_value >= signature_init_fee + const::min_gas_amount());
-
-    cell  state_init = calculate_signature_stateinit(my_address(), item_address, signee_address, signature_code);
-    slice signature_address = get_address_by_stateinit(0, state_init);
-    cell  body = begin_cell().store_uint(0x1, 1).end_cell();  ;; any non empty body to handle init
-
-    var msg = begin_cell()
-              .store_uint(0x18, 6)
-              .store_slice(signature_address)
-              .store_coins(signature_init_amount)
-              .store_uint(4 + 2 + 1, 1 + 4 + 4 + 64 + 32 + 1 + 1 + 1)
-              .store_ref(state_init)
-              .store_ref(body)
-            .end_cell();
-
-    send_raw_message(msg, 1); ;; paying fees, revert on errors
-
-    signature_open_cnt += 1;
-    save_data();
-
-    return ();
-}
-
-
 () handle::collect_stats(slice sender_address, slice in_msg_body) impure {
     slice item_address = in_msg_body~load_msg_addr();
     slice signee_address = in_msg_body~load_msg_addr();
@@ -205,30 +113,6 @@ global int min_balance;
     return ();
 }
 
-
-() handle::return_item(slice sender_address, slice in_msg_body) impure {
-    throw_unless(exit::wrong_return_sender(), equal_slices(sender_address, owner_address));
-
-    slice item_address = in_msg_body~load_msg_addr();
-    slice signee_address = in_msg_body~load_msg_addr();
-    slice item_owner_address = in_msg_body~load_msg_addr();
-
-    cell state_init = calculate_signature_stateinit(my_address(), item_address, signee_address, signature_code);
-    slice signature_address = get_address_by_stateinit(0, state_init);
-
-    var msg = begin_cell()
-          .store_uint(0x10, 6) ;; nobounce
-          .store_slice(signature_address)
-          .store_coins(const::return_item_amount())
-          .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
-          .store_uint(op::fix_owner(), 32)
-          .store_uint(0, 64) 
-          .store_slice(item_owner_address);
-
-    send_raw_message(msg.end_cell(), 1);  ;; paying fees, revert on errors
-
-    return ();
-}
 
 ;; -------------------------- Internal --------------------------
 
@@ -249,12 +133,6 @@ global int min_balance;
 
     load_data();
 
-    ;; initialize contract
-    if (signature_init_amount == 0) {
-        handle::init(my_balance, msg_value, sender_address, in_msg_body);
-        return ();
-    }
-
     ;; gas safeguard
     throw_unless(exit::insufficient_msg_value(), msg_value >= const::min_gas_amount());
 
@@ -266,33 +144,15 @@ global int min_balance;
         return();
     }
 
-    ;; update fees
-    if (op == op::update_fees()) {
-        handle::update_fees(my_balance, msg_value, sender_address, in_msg_body);
-        return();
-    }
-
     ;; change provider owner
     if (op == op::change_owner()) {
         handle::change_owner(sender_address, in_msg_body);
         return();
     }
 
-    ;; mint signature
-    if (op == op::mint_signature()) {
-        handle::mint_signature(msg_value, sender_address, in_msg_body);
-        return();
-    }
-
     ;; collect stats
     if (op == op::notify_sign()) {
         handle::collect_stats(sender_address, in_msg_body);
-        return();
-    }
-
-    ;; return item
-    if (op == op::return_item()) {
-        handle::return_item(sender_address, in_msg_body);
         return();
     }
 
@@ -312,15 +172,9 @@ global int min_balance;
 }
 
 
-(int, int) get_stats() method_id {
+(int) get_stats() method_id {
   load_data();
-  return (signature_open_cnt, signature_commit_cnt);
-}
-
-
-(int, int, int) get_fees() method_id {
-  load_data();
-  return (signature_init_amount, signature_init_fee, min_balance);
+  return signature_commit_cnt;
 }
 
 
