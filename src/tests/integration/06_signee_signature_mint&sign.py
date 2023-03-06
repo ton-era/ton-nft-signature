@@ -32,11 +32,11 @@ if __name__ == '__main__':
         provider_address=provider_address)
     print(f'contract: {signature.address.to_string(True, True, True)}')
 
-    # API :: deploy
+    # API :: mint & sign
     result = signature.signee_mint(
-        op_amount=0.1 + 0.001, message="From Pavel with love..",
+        op_amount=0.11, message="From Pavel with love..",
         wallet=wallet, client=client, send=send)
-    print('-------------- API :: deploy --------------')
+    print('-------------- API :: signee_mint --------------')
     print(result)
 
     # GET :: signature get_info

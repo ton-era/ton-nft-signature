@@ -43,13 +43,13 @@ if __name__ == '__main__':
 
     if send:
         print('\nwaiting to finalize wallet seqno...\n')
-        time.sleep(12)
+        time.sleep(15)
 
     # API :: approve from NFT owner
     item = NFTItem(address=Address(item_address))
 
     result = item.approve(
-        op_amount=0.11, signature_address=signature.address, forward_amount=0.08,
+        op_amount=0.12, signature_address=signature.address, forward_amount=0.08,
         wallet=wallet, client=client, send=send)
     print('-------------- API :: owner approve --------------')
     print(result)

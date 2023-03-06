@@ -32,7 +32,7 @@ class NFTSignature(Contract):
 
         return cell
 
-    def create_signee_mint_payload(self, query_id=0, payload=None):
+    def create_signee_sign_payload(self, query_id=0, payload=None):
         cell = Cell()
         cell.bits.write_uint(OP_SIGN, 32)
         cell.bits.write_uint(query_id, 64)
@@ -66,7 +66,15 @@ class NFTSignature(Contract):
                     op_amount, message,
                     wallet, client, send=True):
         state_init = self.create_state_init()['state_init']
-        payload=self.create_signee_mint_payload(payload=message)
+        payload=self.create_signee_sign_payload(payload=message)
+
+        return self.api_call(wallet, client, op_amount, state_init, payload, send)
+
+    def signee_sign(self, 
+                    op_amount, message,
+                    wallet, client, send=True):
+        state_init = None
+        payload=self.create_signee_sign_payload(payload=message)
 
         return self.api_call(wallet, client, op_amount, state_init, payload, send)
 
